@@ -1,13 +1,12 @@
 import dlib
 import numpy as np
+from math import sqrt, acos, degrees
 
 
 class VectorTools:
 
     @staticmethod
-    def angle_between(v1, v2):
-        from math import sqrt, acos, degrees
-
+    def angle_between(v1, v2, cosinus=False):
         x1, y1 = v1[0], v1[1]
         x2, y2 = v2[0], v2[1]
 
@@ -18,8 +17,7 @@ class VectorTools:
             return sqrt(x ** 2 + y ** 2)
 
         cos = scalar(x1, y1, x2, y2) / (module(x1, y1) * module(x2, y2))
-        ang = acos(cos)
-        return degrees(acos(cos))
+        return degrees(acos(cos)) if cosinus is False else cos
 
     @staticmethod
     def get_vector(x1, y1, x2, y2):

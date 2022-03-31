@@ -71,20 +71,21 @@ class pupil_detection():
                 final_cnt = cnt
             else:
                 continue
-        (x, y), radius = cv2.minEnclosingCircle(final_cnt)
-        center = (int(x), int(y))
-        radius = int(radius)
-        # cv2.circle(self._img, center, radius, (255, 0, 0), 2)
-        if center[0] / self.image_center[0] < 0.85 or center[0] / self.image_center[0] > 1.15 \
-                or center[1] / self.image_center[1] < 0.85 or center[1] / self.image_center[1] > 1.15:
-            self._pupil = None
+        if final_cnt is not None:
+            (x, y), radius = cv2.minEnclosingCircle(final_cnt)
+            center = (int(x), int(y))
+            radius = int(radius)
+            # cv2.circle(self._img, center, radius, (255, 0, 0), 2)
+            if center[0] / self.image_center[0] < 0.85 or center[0] / self.image_center[0] > 1.15 \
+                    or center[1] / self.image_center[1] < 0.85 or center[1] / self.image_center[1] > 1.15:
+                self._pupil = None
+            else:
+                self._pupil = (center[0], center[1], radius)
         else:
-            self._pupil = (center[0], center[1], radius)
-        # self.show_image(self._img)
+            self._pupil = None
 
     def start_detection(self):
         if self._img is not None:
             self.centroid()
             self.detect_pupil()
-            # return self._img
 
