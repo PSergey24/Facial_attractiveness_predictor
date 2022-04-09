@@ -23,10 +23,6 @@ class FaceDetector:
 
         self.vector_tools = VectorTools()
 
-        # self.image_way = self.project_way + '/data/images/Alexandra_Daddario.jpeg'  # blue
-        # self.image_way = self.project_way + '/data/images/Emma_Watson.jpg' #gray
-        # self.image_way = self.project_way + '/data/images/Olivia_Wilde.jpeg' #green
-
         self.image_way = self.project_way + '/data/images/3/' + img_way
 
         self.face_img = []

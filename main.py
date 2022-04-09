@@ -33,7 +33,7 @@ def train_model():
     # photos = get_scores(good_files)
     # save_features_to_file(photos)
 
-    features = read_features()
+    features = read_features_from_file()
 
     train, test = get_data(features)
     trainer = Trainer(linear_model)
@@ -63,7 +63,7 @@ def get_feature_handler(way):
         print(f'Get features mistake: {way}')
 
 
-def read_features():
+def read_features_from_file():
     with open('data/image_features.pkl', 'rb') as inp:
         features = pickle.load(inp)
         return features
