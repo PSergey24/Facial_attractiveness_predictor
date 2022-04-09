@@ -43,7 +43,7 @@ class CvTools:
         y = rect.top()
         w = rect.right() - x
         h = rect.bottom() - y
-        return (x, y, w, h)
+        return x, y, w, h
 
     @staticmethod
     def bb_to_rect(x, y, w, h):

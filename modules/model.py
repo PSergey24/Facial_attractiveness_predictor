@@ -1,3 +1,4 @@
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -33,18 +34,15 @@ class Trainer:
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
 
-    def start(self, data, data_test):
-        n_epoch = 10
+        self.train = None
+        self.test = None
 
-        X = []
-        y = []
-        for item in data:
-            X.append(item[:-1])
-            y.append(item[-1])
-        X = torch.FloatTensor(X)
-        y = torch.FloatTensor(y)
+    def start(self, train, test):
+        self.train, self.test = train, test
+        n_epoch = 80
 
         for i, epoch in enumerate(range(n_epoch)):
+            X, y = self.shuffle_train()
             y_predicted = self.model(X)
 
             loss = self.criterion(y_predicted, y)
@@ -56,14 +54,23 @@ class Trainer:
             print(f'epoch: {i}, loss: {loss.item():.4f}')
         self.model.save()
 
-        X = []
-        for item in data_test:
-            X.append(item)
+        X, y = [], []
+        for item in self.test:
+            X.append(item.features)
+            y.append(item.score)
         X = torch.FloatTensor(X)
         y_predicted = self.model(X)
-        print(y_predicted)
-        print(1)
 
+        for i, item in enumerate(self.test):
+            print(f'{item.name}: prediction = {y_predicted[i]}, score = {y[i]}')
+
+    def shuffle_train(self):
+        random.shuffle(self.train)
+        X, y = [], []
+        for item in self.train:
+            X.append(item.features)
+            y.append([item.score])
+        return torch.FloatTensor(X), torch.FloatTensor(y)
 
 
 

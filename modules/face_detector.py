@@ -3,7 +3,7 @@ import os
 import math
 import dlib
 import numpy as np
-from skimage.feature import greycomatrix, greycoprops
+from skimage.feature import graycomatrix, graycoprops
 from .pupil_detector import pupil_detection
 from .tools import VectorTools, CvTools
 
@@ -27,7 +27,7 @@ class FaceDetector:
         # self.image_way = self.project_way + '/data/images/Emma_Watson.jpg' #gray
         # self.image_way = self.project_way + '/data/images/Olivia_Wilde.jpeg' #green
 
-        self.image_way = self.project_way + '/data/images/' + img_way
+        self.image_way = self.project_way + '/data/images/3/' + img_way
 
         self.face_img = []
         self.eyes_img = []
@@ -252,23 +252,18 @@ class FaceDetector:
     def get_glcm_features(self, image):
         size = 15
         scratch_locations = [self.forehead_landmark, self.left_cheek, self.right_cheek]
-        scratch_patches = []
-        for loc in scratch_locations:
-            scratch_patches.append(image[loc[1]:loc[1] + size,
-                                   loc[0]:loc[0] + size])
-        # face_img = img[y: y + h, x: x + w]
-        dis_sim = []
+        scratch_patches = [image[loc[1]:loc[1] + size, loc[0]:loc[0] + size] for loc in scratch_locations]
+
         corr = []
         homogen = []
         energy = []
         contrast = []
         for patch in scratch_patches:
-            glcm = greycomatrix(patch, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
-            dis_sim.append(greycoprops(glcm, 'dissimilarity')[0, 0])
-            corr.append(greycoprops(glcm, 'correlation')[0, 0])
-            homogen.append(greycoprops(glcm, 'homogeneity')[0, 0])
-            energy.append(greycoprops(glcm, 'energy')[0, 0])
-            contrast.append(greycoprops(glcm, 'contrast')[0, 0])
+            glcm = graycomatrix(patch, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
+            corr.append(graycoprops(glcm, 'correlation')[0, 0])
+            homogen.append(graycoprops(glcm, 'homogeneity')[0, 0])
+            energy.append(graycoprops(glcm, 'energy')[0, 0])
+            contrast.append(graycoprops(glcm, 'contrast')[0, 0])
         self.features += corr
         self.features += homogen
         self.features += energy
@@ -277,7 +272,7 @@ class FaceDetector:
         self.normalized_features += corr
         self.normalized_features += homogen
         self.normalized_features += energy
-        self.normalized_features += contrast
+        self.normalized_features += [item/255 for item in contrast]
 
     def get_skin_colors_features(self, img):
         skin_pointers = self.get_skin_pointers(img)
@@ -369,7 +364,6 @@ class FaceDetector:
         pointer_g = self.filter_by_median(pointer_g)
         pointer_r = self.filter_by_median(pointer_r)
         self.eyes_color = [max(pointer_r), max(pointer_b), max(pointer_g)]
-        print("Max color (RGB): " + str(self.eyes_color))
 
     @staticmethod
     def filter_extreme_values(a, b, c):
