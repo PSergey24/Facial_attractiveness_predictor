@@ -31,11 +31,8 @@ class VectorTools:
 # convert data from dlib to OpenCV and back
 class CvTools:
     @staticmethod
-    def shape_to_np(shape, dtype="int"):
-        coords = np.zeros((68, 2), dtype=dtype)
-        for i in range(0, 68):
-            coords[i] = (shape.part(i).x, shape.part(i).y)
-        return coords
+    def shape_to_np(shape):
+        return [(shape.part(i).x, shape.part(i).y) for i in range(0, shape.num_parts)]
 
     @staticmethod
     def rect_to_bb(rect):

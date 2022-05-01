@@ -11,136 +11,59 @@ from .tools import VectorTools, CvTools
 class FaceDetector:
 
     def __init__(self, img_way):
+        self.vector_tools = VectorTools()
+        self.image_way = img_way
+
         self.project_way = os.path.abspath('')
         # OpenCV detection
-        self.eye_cascade = cv2.CascadeClassifier(self.project_way + '/data/classifiers/haarcascade_eye_tree_eyeglasses.xml')
-        self.face_cascade = cv2.CascadeClassifier(self.project_way + '/data/classifiers/haarcascade_frontalface_default.xml')
+        self.eye_detector = cv2.CascadeClassifier(self.project_way + '/data/classifiers/haarcascade_eye_tree_eyeglasses.xml')
 
         # face detection with dlib
         self.face_detector = dlib.get_frontal_face_detector()
-        self.landmarks_detector = dlib.shape_predictor(
-            self.project_way + '/data/classifiers/shape_predictor_68_face_landmarks.dat')
-
-        self.vector_tools = VectorTools()
-
-        self.image_way = self.project_way + '/data/images/3/' + img_way
-
-        self.face_img = []
-        self.eyes_img = []
+        self.landmarks_detector = dlib.shape_predictor(self.project_way + '/data/classifiers/shape_predictor_68_face_landmarks.dat')
 
         self.iris_pointers = []
         self.radius_to_iris = 25
         self.eyes_color = None
 
         self.landmarks = []
-        self.hair_landmark = None
         self.top_face_landmark = None
         self.forehead_landmark = None
         self.left_cheek = None
         self.right_cheek = None
-        self.glcm_locations = []
+        self.left_nasolabial_triangle = None
+        self.right_nasolabial_triangle = None
+        self.size_special_landmarks = None
 
         self.features = []
-        self.normalized_features = []
 
-    def get_features(self):
+    def get_photo_features(self):
         img = cv2.imread(self.image_way)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray, 1)
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_img, 1)
 
         for face in faces:
-            landmarks = self.landmarks_detector(gray, face)
-            landmarks = CvTools.shape_to_np(landmarks)
-            for i, (x, y) in enumerate(landmarks):
-                self.landmarks.append((x, y))
+            self.get_landmarks(gray_img, face)
+            self.to_process_landmarks()
 
             (x, y, w, h) = CvTools.rect_to_bb(face)
-            self.face_img.append((x, y, w, h))
-            face_img = img[y: y + h, x: x + w]
-            face_img_gray = gray[y:y + h, x:x + w]
+            img_face = img[y: y + h, x: x + w]
+            img_face_gray = gray_img[y:y + h, x:x + w]
+            self.correct_size(w)
 
-            self.to_process_landmarks()
-            self.get_glcm_features(gray)
-            self.get_skin_colors_features(img)
+            eyes = self.eye_detector.detectMultiScale(img_face_gray, 1.1, 4)
+            self.to_process_eyes(eyes, img_face)
+            self.get_features(img, gray_img)
 
-            eyes = self.eye_cascade.detectMultiScale(face_img_gray, 1.1, 4)
-            for i, (ex, ey, ew, eh) in enumerate(eyes):
-                eye_img = face_img[ey:ey + eh, ex:ex + ew]
-
-                pupil = pupil_detection(eye_img, int(ew/2), int(eh/2))
-                pupil.start_detection()
-                if pupil._pupil is not None:
-                    self.get_iris_points(eye_img, pupil)
-                else:
-                    self.get_iris_points_2(eye_img, ew, eh)
-                self.eyes_img.append((ex, ey, ew, eh))
-            self.get_eyes_color_features()
-
-    def find_eyes(self):
-        img = cv2.imread(self.image_way)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector(gray, 1)
-
-        for face in faces:
-            landmarks = self.landmarks_detector(gray, face)
-            landmarks = CvTools.shape_to_np(landmarks)
-            for i, (x, y) in enumerate(landmarks):
-                self.landmarks.append((x, y))
-                cv2.circle(img, (x, y), 4, (255, 0, 0), -1)
-
-            (x, y, w, h) = CvTools.rect_to_bb(face)
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-            self.face_img.append((x, y, w, h))
-            face_img = img[y: y + h, x: x + w]
-            face_img_gray = gray[y:y + h, x:x + w]
-
-            self.to_process_landmarks()
-            cv2.circle(img, (self.top_face_landmark[0], self.top_face_landmark[1]), 8, (191, 2, 138), -1)
-            cv2.circle(img, (self.forehead_landmark[0], self.forehead_landmark[1]), 3, (191, 2, 138), -1)
-            cv2.circle(img, (self.hair_landmark[0], self.hair_landmark[1]), 3, (191, 2, 138), -1)
-            cv2.rectangle(img, (self.forehead_landmark[0] - 15, self.forehead_landmark[1] - 15),
-                          (self.forehead_landmark[0] + 15, self.forehead_landmark[1] + 15), (0, 255, 0), 3)
-
-            cv2.circle(img, (self.left_cheek[0], self.left_cheek[1]), 3, (191, 2, 138), -1)
-            cv2.rectangle(img, (self.left_cheek[0] - 15, self.left_cheek[1] - 15),
-                          (self.left_cheek[0] + 15, self.left_cheek[1] + 15), (0, 255, 0), 3)
-
-            cv2.circle(img, (self.right_cheek[0], self.right_cheek[1]), 3, (191, 2, 138), -1)
-            cv2.rectangle(img, (self.right_cheek[0] - 15, self.right_cheek[1] - 15),
-                          (self.right_cheek[0] + 15, self.right_cheek[1] + 15), (0, 255, 0), 3)
-
-            self.get_glcm_features(gray)
-            self.get_skin_colors_features(img)
-
-            eyes = self.eye_cascade.detectMultiScale(face_img_gray, 1.1, 4)
-            for i, (ex, ey, ew, eh) in enumerate(eyes):
-                cv2.rectangle(face_img, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 5)
-                eye_img = face_img[ey:ey + eh, ex:ex + ew]
-
-                pupil = pupil_detection(eye_img, int(ew/2), int(eh/2))
-                pupil.start_detection()
-                if pupil._pupil is not None:
-                    self.get_iris_points(eye_img, pupil)
-                else:
-                    self.get_iris_points_2(eye_img, ew, eh)
-
-                cv2.imshow("eye " + str(i), eye_img)
-                self.eyes_img.append((ex, ey, ew, eh))
-            self.get_eyes_color_features()
-        cv2.imshow('img', img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    def get_landmarks(self, gray_img, face):
+        landmarks = self.landmarks_detector(gray_img, face)
+        self.landmarks = CvTools.shape_to_np(landmarks)
 
     def to_process_landmarks(self):
         self.get_special_face_landmark()
-        self.get_landmarks_features()
-        self.to_normalize_landmarks_features()
 
     def get_special_face_landmark(self):
         difference = self.landmarks[8][0] - self.landmarks[27][0], self.landmarks[8][1] - self.landmarks[27][1]
-        x = int(self.landmarks[8][0] - difference[0] * 1.85)
-        y = int(self.landmarks[8][1] - difference[1] * 1.85)
-        self.hair_landmark = (x, y)
 
         x = int(self.landmarks[8][0] - difference[0] * 1.6)
         y = int(self.landmarks[8][1] - difference[1] * 1.6)
@@ -151,41 +74,65 @@ class FaceDetector:
         self.forehead_landmark = (x, y)
 
         x = self.landmarks[29][0] + int(abs(self.landmarks[29][0] - self.landmarks[14][0]) / 2)
-        y = self.landmarks[29][1] + int(abs(self.landmarks[29][1] - self.landmarks[14][1]) / 2)
+        y = min(self.landmarks[29][1], self.landmarks[14][1]) + int(abs(self.landmarks[29][1] - self.landmarks[14][1]) / 2)
         self.left_cheek = (x, y)
 
+        x = self.landmarks[35][0] + int(abs(self.landmarks[35][0] - self.landmarks[13][0]) / 3)
+        y = min(self.landmarks[35][1], self.landmarks[13][1]) + int(abs(self.landmarks[35][1] - self.landmarks[13][1]) / 2)
+        self.left_nasolabial_triangle = (x, y)
+
         x = self.landmarks[29][0] - int(abs(self.landmarks[29][0] - self.landmarks[2][0]) / 2)
-        y = self.landmarks[29][1] + int(abs(self.landmarks[29][1] - self.landmarks[2][1]) / 2)
+        y = min(self.landmarks[29][1], self.landmarks[2][1]) + int(abs(self.landmarks[29][1] - self.landmarks[2][1]) / 2)
         self.right_cheek = (x, y)
+
+        x = self.landmarks[31][0] - int(abs(self.landmarks[31][0] - self.landmarks[3][0]) / 3)
+        y = min(self.landmarks[31][1], self.landmarks[3][1]) + int(abs(self.landmarks[31][1] - self.landmarks[3][1]) / 2)
+        self.right_nasolabial_triangle = (x, y)
+
+    def to_process_eyes(self, eyes, img_face):
+        for i, (ex, ey, ew, eh) in enumerate(eyes):
+            eye_img = img_face[ey:ey + eh, ex:ex + ew]
+            pupil = pupil_detection(eye_img, int(ew / 2), int(eh / 2))
+            pupil.start_detection()
+            if pupil._pupil is not None:
+                self.get_iris_points(eye_img, pupil)
+            else:
+                self.get_iris_points_2(eye_img, ew, eh)
+
+    def get_features(self, img, gray_img):
+        self.get_landmarks_features()
+        self.get_glcm_features(gray_img)
+        # self.get_skin_colors_features(img)
+        # self.get_eyes_color_features()
 
     def get_landmarks_features(self):
         # Description of facial ratios used
         # 1. Eyes width / Distance between eyes
-        self.get_feature(36, 39, 39, 42)
+        self.get_landmark_feature(36, 39, 39, 42)
 
         # 2. Eyes width / Nose width
-        self.get_feature(36, 39, 31, 35)
+        self.get_landmark_feature(36, 39, 31, 35)
 
         # 3. Mouth width / Distance between eyes
-        self.get_feature(48, 54, 39, 42)
+        self.get_landmark_feature(48, 54, 39, 42)
 
         # 4. Distance between upper lip and jaw / Distance between eyes
-        self.get_feature(51, 8, 39, 42)
+        self.get_landmark_feature(51, 8, 39, 42)
 
         # 5. Distance between upper lip and jaw / Nose width
-        self.get_feature(51, 8, 31, 35)
+        self.get_landmark_feature(51, 8, 31, 35)
 
         # 6. Distance between eyes / Lip height
-        self.get_feature(39, 42, 51, 57)
+        self.get_landmark_feature(39, 42, 51, 57)
 
         # print("7. Nose width / Distance between eyes :")
-        self.get_feature(31, 35, 39, 42)
+        self.get_landmark_feature(31, 35, 39, 42)
 
         # print("8. Nose width / Upper lip height :")
-        self.get_feature(31, 35, 51, 62)
+        self.get_landmark_feature(31, 35, 51, 62)
 
         # 9. Distance between eyes / Distance between nose and mouth
-        self.get_feature(39, 42, 33, 51)
+        self.get_landmark_feature(39, 42, 33, 51)
 
         average_point = (int((self.landmarks[22][0] + self.landmarks[21][0]) / 2),
                          int((self.landmarks[22][1] + self.landmarks[21][1]) / 2))
@@ -205,7 +152,7 @@ class FaceDetector:
         self.features.append(d1 / d2)
 
         # 13. Distance between eyes / Nose width
-        self.get_feature(39, 42, 31, 35)
+        self.get_landmark_feature(39, 42, 31, 35)
 
         # 14. Face height / Face width
         d1 = self.vector_tools.euclid_distance(self.top_face_landmark, self.landmarks[8])
@@ -214,10 +161,10 @@ class FaceDetector:
 
         # Description of Symmetry ratios used
         # 15. eyebrow length
-        self.get_feature(21, 17, 22, 26)
+        self.get_landmark_feature(21, 17, 22, 26)
 
         # 16. Lower lip length
-        self.get_feature(48, 57, 54, 57)
+        self.get_landmark_feature(48, 57, 54, 57)
 
         # 17. Upper eyebrow
         d1 = self.vector_tools.euclid_distance(self.landmarks[19], average_point)
@@ -225,61 +172,38 @@ class FaceDetector:
         self.features.append(d1 / d2)
 
         # 18. Upper lip
-        self.get_feature(48, 51, 54, 51)
+        self.get_landmark_feature(48, 51, 54, 51)
 
         # 19. Nose
-        self.get_feature(31, 33, 35, 33)
+        self.get_landmark_feature(31, 33, 35, 33)
 
-    def to_normalize_landmarks_features(self):
-        mean = np.mean([self.features])
-        std = np.std([self.features])
-
-        z_values = [(item - mean) / std for item in self.features]
-        for i, z in enumerate(z_values):
-            ub = 1.618 if i < 14 else 1
-            res = ((z - min(z_values)) / (max(z_values) - min(z_values))) * ub
-            self.normalized_features.append(res)
-
-    def get_feature(self, l1, l2, l3, l4):
+    def get_landmark_feature(self, l1, l2, l3, l4):
         d1 = self.vector_tools.euclid_distance(self.landmarks[l1], self.landmarks[l2])
         d2 = self.vector_tools.euclid_distance(self.landmarks[l3], self.landmarks[l4])
         self.features.append(d1 / d2)
 
     def get_glcm_features(self, image):
-        size = 15
-        scratch_locations = [self.forehead_landmark, self.left_cheek, self.right_cheek]
-        scratch_patches = [image[loc[1]:loc[1] + size, loc[0]:loc[0] + size] for loc in scratch_locations]
+        scratch_locations = [self.forehead_landmark, self.left_cheek, self.right_cheek, self.left_nasolabial_triangle,
+                             self.right_nasolabial_triangle]
+        scratch_patches = [image[loc[1]:loc[1] + self.size_special_landmarks[i],
+                           loc[0]:loc[0] + self.size_special_landmarks[i]] for i, loc in enumerate(scratch_locations)]
 
-        corr = []
-        homogen = []
-        energy = []
-        contrast = []
         for patch in scratch_patches:
             glcm = graycomatrix(patch, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
-            corr.append(graycoprops(glcm, 'correlation')[0, 0])
-            homogen.append(graycoprops(glcm, 'homogeneity')[0, 0])
-            energy.append(graycoprops(glcm, 'energy')[0, 0])
-            contrast.append(graycoprops(glcm, 'contrast')[0, 0])
-        self.features += corr
-        self.features += homogen
-        self.features += energy
-        self.features += contrast
-
-        self.normalized_features += corr
-        self.normalized_features += homogen
-        self.normalized_features += energy
-        self.normalized_features += [item/255 for item in contrast]
+            self.features.append(graycoprops(glcm, 'correlation')[0, 0])
+            self.features.append(graycoprops(glcm, 'homogeneity')[0, 0])
+            self.features.append(graycoprops(glcm, 'energy')[0, 0])
+            self.features.append(graycoprops(glcm, 'contrast')[0, 0])
 
     def get_skin_colors_features(self, img):
         skin_pointers = self.get_skin_pointers(img)
         average_colors = self.get_average_skin_color(skin_pointers)
         self.get_features_based_on_skin_color(average_colors)
-        return img
 
     def get_skin_pointers(self, img):
         radius = 10
         skin_pointers = []
-        for i, loc in enumerate([self.forehead_landmark, self.left_cheek, self.right_cheek, self.hair_landmark]):
+        for i, loc in enumerate([self.forehead_landmark, self.left_cheek, self.right_cheek]):
             pointers = []
             for d in range(0, 360, 5):
                 radian = (d * math.pi) / 180
@@ -309,9 +233,76 @@ class FaceDetector:
             self.features.append(item[1])
             self.features.append(item[2])
 
-            self.normalized_features.append(item[0] / 255)
-            self.normalized_features.append(item[1] / 255)
-            self.normalized_features.append(item[2] / 255)
+    def process_photo(self):
+        img = cv2.imread(self.image_way)
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_detector(gray_img, 1)
+
+        for face in faces:
+            self.get_landmarks(gray_img, face)
+            self.to_process_landmarks()
+            self.display_landmarks(img)
+
+            (x, y, w, h) = CvTools.rect_to_bb(face)
+            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+            img_face = img[y: y + h, x: x + w]
+            img_face_gray = gray_img[y:y + h, x:x + w]
+
+            self.correct_size(w)
+            self.display_special_landmarks(img)
+
+            eyes = self.eye_detector.detectMultiScale(img_face_gray, 1.1, 4)
+            self.to_process_eyes(eyes, img_face)
+
+            self.get_features(img, gray_img)
+
+        # self.save_file_with_landmarks(img)
+
+        cv2.imshow('img', img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    def save_file_with_landmarks(self, img):
+        folders = self.image_way.split('/')
+        folders.insert(len(folders) - 1, 'copy')
+        names = folders[-1].split('.')
+        names[0] += '_landmarks'
+        folders[-1] = ".".join(names)
+        new_way = "/".join(folders)
+        cv2.imwrite(new_way, img)
+
+    def display_landmarks(self, img):
+        for i, (x, y) in enumerate(self.landmarks):
+            cv2.circle(img, (x, y), 2, (255, 0, 0), -1)
+
+    def correct_size(self, w):
+        self.size_special_landmarks = [int(w * 0.07), int(w * 0.05), int(w * 0.05), int(w * 0.035), int(w * 0.035)]
+
+    def display_special_landmarks(self, img):
+        cv2.circle(img, (self.top_face_landmark[0], self.top_face_landmark[1]), 2, (191, 2, 138), -1)
+        cv2.circle(img, (self.forehead_landmark[0], self.forehead_landmark[1]), 2, (191, 2, 138), -1)
+
+        cv2.rectangle(img, (self.forehead_landmark[0] - self.size_special_landmarks[0], self.forehead_landmark[1] - self.size_special_landmarks[0]),
+                      (self.forehead_landmark[0] + self.size_special_landmarks[0], self.forehead_landmark[1] + self.size_special_landmarks[0]), (0, 255, 0), 1)
+
+        cv2.circle(img, (self.left_cheek[0], self.left_cheek[1]), 2, (191, 2, 138), -1)
+        cv2.rectangle(img, (self.left_cheek[0] - self.size_special_landmarks[1], self.left_cheek[1] - self.size_special_landmarks[1]),
+                      (self.left_cheek[0] + self.size_special_landmarks[1], self.left_cheek[1] + self.size_special_landmarks[1]), (0, 255, 0), 1)
+
+        cv2.circle(img, (self.right_cheek[0], self.right_cheek[1]), 2, (191, 2, 138), -1)
+        cv2.rectangle(img, (self.right_cheek[0] - self.size_special_landmarks[2], self.right_cheek[1] - self.size_special_landmarks[2]),
+                      (self.right_cheek[0] + self.size_special_landmarks[2], self.right_cheek[1] + self.size_special_landmarks[2]), (0, 255, 0), 1)
+
+        cv2.circle(img, (self.left_nasolabial_triangle[0], self.left_nasolabial_triangle[1]), 2, (191, 2, 138), -1)
+        cv2.rectangle(img, (self.left_nasolabial_triangle[0] - self.size_special_landmarks[3], self.left_nasolabial_triangle[1] - self.size_special_landmarks[3]),
+                      (self.left_nasolabial_triangle[0] + self.size_special_landmarks[3],
+                       self.left_nasolabial_triangle[1] + self.size_special_landmarks[3]), (0, 255, 0), 1)
+
+        cv2.circle(img, (self.right_nasolabial_triangle[0], self.right_nasolabial_triangle[1]), 2, (191, 2, 138), -1)
+        cv2.rectangle(img, (self.right_nasolabial_triangle[0] - self.size_special_landmarks[4],
+                            self.right_nasolabial_triangle[1] - self.size_special_landmarks[4]),
+                      (self.right_nasolabial_triangle[0] + self.size_special_landmarks[4],
+                       self.right_nasolabial_triangle[1] + self.size_special_landmarks[4]), (0, 255, 0), 1)
 
     # decision based on pupil detector
     def get_iris_points(self, eye_img, pupil):
@@ -386,4 +377,3 @@ class FaceDetector:
     def get_features_based_on_eyes_color(self):
         for color in self.eyes_color:
             self.features.append(color)
-            self.normalized_features.append(color / 255)

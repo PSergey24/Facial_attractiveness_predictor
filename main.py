@@ -13,19 +13,6 @@ class ImageFeature:
         self.score = float(score.replace(',', '.'))
 
 
-def main():
-    # process_photo('CF_0000.jpg')
-    train_model()
-
-
-def process_photo(name):
-    face_detector = FaceDetector(name)
-    try:
-        face_detector.find_eyes()
-    except Exception:
-        print("Get features mistake")
-
-
 def train_model():
     linear_model = LinearModel(46, 256, 1)
 
@@ -57,8 +44,8 @@ def save_features_to_file(photos):
 def get_feature_handler(way):
     face_detector = FaceDetector(way)
     try:
-        face_detector.get_features()
-        return face_detector.normalized_features
+        face_detector.get_photo_features()
+        return face_detector.features
     except Exception:
         print(f'Get features mistake: {way}')
 
@@ -76,12 +63,6 @@ def get_data(features):
     return train, test
 
 
-def get_files_list(path):
-    files = os.listdir(path)
-    temp = map(lambda name: os.path.join(path, name), files)
-    return [name.split('/')[-1] for name in temp]
-
-
 def get_scores(files):
     with open('data/Face_scores.csv', 'r', newline='') as csvfile:
         csv_reader = csv.reader(csvfile, delimiter=',')
@@ -89,16 +70,43 @@ def get_scores(files):
     return photos
 
 
-def rename_files():
-    path = 'data/images/2'
-    files = os.listdir(path)
+class Helper:
 
-    for index, file in enumerate(files):
-        name = "CF_" + "{0:0>4}".format(index)
-        os.rename(os.path.join(path, file), os.path.join(path, ''.join([name, '.jpg'])))
+    def main(self):
+        name = os.path.abspath('') + '/data/images/005.jpg'
+        self.process_photo(name)
+        # train_model()
+
+    @staticmethod
+    def process_photo(name):
+        face_detector = FaceDetector(name)
+        face_detector.process_photo()
+
+    def get_files_with_landmarks(self):
+        way = os.path.abspath('') + '/data/images/notsure'
+        files = self.get_files_list(way)
+        for i, file in enumerate(files):
+            if file != 'copy' and file.split('.')[1] in ['jpg', 'webp', 'jpeg']:
+                self.process_photo(way + '/' + file)
+                print(i, i / len(files))
+
+    @staticmethod
+    def get_files_list(path):
+        temp = map(lambda name: os.path.join(path, name), os.listdir(path))
+        return [name.split('/')[-1] for name in temp]
+
+    @staticmethod
+    def rename_files():
+        path = 'data/images/2'
+        files = os.listdir(path)
+
+        for index, file in enumerate(files):
+            name = "CF_" + "{0:0>4}".format(index)
+            os.rename(os.path.join(path, file), os.path.join(path, ''.join([name, '.jpg'])))
 
 
 if __name__ == '__main__':
-    main()
-    # rename_files()
-    # get_files_list()
+    helper = Helper()
+    helper.main()
+
+    # helper.get_files_with_landmarks()
