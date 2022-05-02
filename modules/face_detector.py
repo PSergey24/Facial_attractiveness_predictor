@@ -51,8 +51,8 @@ class FaceDetector:
             img_face_gray = gray_img[y:y + h, x:x + w]
             self.correct_size(w)
 
-            eyes = self.eye_detector.detectMultiScale(img_face_gray, 1.1, 4)
-            self.to_process_eyes(eyes, img_face)
+            # eyes = self.eye_detector.detectMultiScale(img_face_gray, 1.1, 4)
+            # self.to_process_eyes(eyes, img_face)
             self.get_features(img, gray_img)
 
     def get_landmarks(self, gray_img, face):
@@ -252,7 +252,7 @@ class FaceDetector:
             self.display_special_landmarks(img)
 
             eyes = self.eye_detector.detectMultiScale(img_face_gray, 1.1, 4)
-            self.to_process_eyes(eyes, img_face)
+            # self.to_process_eyes(eyes, img_face)
 
             self.get_features(img, gray_img)
 

@@ -59,14 +59,14 @@ class Trainer:
 
         X, y = [], []
         for item in self.test:
-            X.append(item.features)
+            X.append(item.normalized)
             y.append(item.score)
         X = torch.FloatTensor(X)
         y_predicted = self.model(X)
         answers = y_predicted.detach().numpy()
 
         for i, item in enumerate(self.test):
-            print(f'{item.name}: prediction = {answers[i]}, our_score = {y[i]}')
+            print(f'{item.name.split("/")[-1]}: prediction = {answers[i]}, our_score = {y[i]}')
 
         mse = self.mse(answers, y)
         print(f'MSE: {mse}')
@@ -78,7 +78,7 @@ class Trainer:
         x, y = [], []
         batch_size = 8
         for i, item in enumerate(self.train):
-            x.append(item.features)
+            x.append(item.normalized)
             y.append([item.score])
             if i % batch_size == batch_size - 1:
                 X.append(torch.FloatTensor(x))
